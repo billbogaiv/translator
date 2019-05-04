@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFrameworks>netstandard2.0;net451</TargetFrameworks>
+        <Description>Applies user-defined translations using constant-values or expressions.</Description>
+        <Authors>Bill Boga</Authors>
+        <PackageId>Translator</PackageId>
+        <PackageTags>translation;conversion</PackageTags>
+        <PackageProjectUrl>https://github.com/billbogaiv/translator/</PackageProjectUrl>
+        <PackageLicenseUrl>https://raw.githubusercontent.com/billbogaiv/translator/master/LICENSE</PackageLicenseUrl>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Version>0.2.0</Version>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net451'">
+        <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+    </ItemGroup>
+</Project>
