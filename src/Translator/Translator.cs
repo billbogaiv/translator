@@ -5,24 +5,35 @@ namespace Translator
 {
     public abstract class Translator<TKey, TValue>
     {
-        private List<Translation<TKey, TValue>> translations = new List<Translation<TKey, TValue>>();
+        private Dictionary<TKey, Dictionary<TKey, HashSet<Translation<TKey, TValue>>>> translations = new Dictionary<TKey, Dictionary<TKey, HashSet<Translation<TKey, TValue>>>>();
 
         public void Add(Translation<TKey, TValue> translation)
         {
-            translations.Add(translation);
-
-            if (!(translation is ForwardOnlyTranslation<TKey, TValue>))
-            {
-                translations.Add(translation.Swap());
-            }
+            AddRange(new[] { translation });
         }
 
         public void AddRange(IEnumerable<Translation<TKey, TValue>> translations)
         {
-            this.translations.AddRange(
-                translations.Union(translations
-                    .Where(x => !(x is ForwardOnlyTranslation<TKey, TValue>))
-                    .Select(x => x.Swap())));
+            foreach (var groupA in translations
+                .Union(translations
+                .Where(x => !(x is ForwardOnlyTranslation<TKey, TValue>))
+                .Select(x => x.Swap()))
+                .GroupBy(x => x.KeyA))
+            {
+                Dictionary<TKey, HashSet<Translation<TKey, TValue>>> keyATranslations;
+
+                if (!this.translations.TryGetValue(groupA.Key, out keyATranslations))
+                {
+                    keyATranslations = new Dictionary<TKey, HashSet<Translation<TKey, TValue>>>();
+
+                    this.translations.Add(groupA.Key, keyATranslations);
+                }
+
+                foreach (var groupB in groupA.GroupBy(x => x.KeyB))
+                {
+                    keyATranslations.Add(groupB.Key, new HashSet<Translation<TKey, TValue>>(groupB));
+                }
+            }
         }
 
         public (bool foundTranslation, IReadOnlyCollection<Translation<TKey, TValue>> translationSteps) TryTranslation(
@@ -63,7 +74,7 @@ namespace Translator
         }
 
         private (bool, List<Translation<TKey, TValue>>) Finder(
-            ICollection<Translation<TKey, TValue>> translations,
+            Dictionary<TKey, Dictionary<TKey, HashSet<Translation<TKey, TValue>>>> translations,
             TValue fromValue,
             TKey fromKey,
             TKey toKey,
@@ -75,45 +86,52 @@ namespace Translator
 
             var keyEqualityComparer = EqualityComparer<TKey>.Default;
             var valueEqualityComparer = EqualityComparer<TValue>.Default;
-            var fromSet = translations
-                .Where(x => x is DirectTranslation<TKey, TValue> directTranslation
-                    ? keyEqualityComparer.Equals(directTranslation.KeyA, fromKey) && valueEqualityComparer.Equals(directTranslation.DirectValueA, fromValue)
-                    : keyEqualityComparer.Equals(x.KeyA, fromKey))
-                .ToList();
 
-            foreach (var item in fromSet)
+            if (translations.TryGetValue(fromKey, out var fromSet))
             {
-                if (keyEqualityComparer.Equals(item.KeyB, toKey))
+                if (fromSet.TryGetValue(toKey, out var toSet))
                 {
-                    translationSteps.Add(item);
-
-                    return (true, translationSteps);
-                }
-            }
-
-            foreach (var item in fromSet)
-            {
-                var pathKey = new KeyValuePair<TKey, TKey>(fromKey, item.KeyB);
-
-                if (!pathsTraveled.Contains(pathKey))
-                {
-                    pathsTraveled.Add(pathKey);
-
-                    var (finderFound, finderTranslationSteps) = Finder(
-                        translations,
-                        item is DirectTranslation<TKey, TValue> directTranslation
-                            ? directTranslation.DirectValueB
-                            : fromValue,
-                        item.KeyB,
-                        toKey,
-                        translationSteps,
-                        pathsTraveled);
-
-                    if (finderFound)
+                    foreach (var item in toSet)
                     {
-                        finderTranslationSteps.Insert(0, item);
+                        if (item is DirectTranslation<TKey, TValue> directTranslation
+                            ? valueEqualityComparer.Equals(directTranslation.DirectValueA, fromValue)
+                            : keyEqualityComparer.Equals(item.KeyB, toKey))
+                        {
+                            translationSteps.Add(item);
 
-                        return (finderFound, finderTranslationSteps);
+                            return (true, translationSteps);
+                        }
+                    }
+                }
+
+                foreach (var item in fromSet
+                    .SelectMany(x => x.Value)
+                    .Where(x => x is DirectTranslation<TKey, TValue> directTranslation
+                        ? valueEqualityComparer.Equals(directTranslation.DirectValueA, fromValue)
+                        : true))
+                {
+                    var pathKey = new KeyValuePair<TKey, TKey>(fromKey, item.KeyB);
+
+                    if (!pathsTraveled.Contains(pathKey))
+                    {
+                        pathsTraveled.Add(pathKey);
+
+                        var (finderFound, finderTranslationSteps) = Finder(
+                            translations,
+                            item is DirectTranslation<TKey, TValue> directTranslation
+                                ? directTranslation.DirectValueB
+                                : fromValue,
+                            item.KeyB,
+                            toKey,
+                            translationSteps,
+                            pathsTraveled);
+
+                        if (finderFound)
+                        {
+                            finderTranslationSteps.Insert(0, item);
+
+                            return (finderFound, finderTranslationSteps);
+                        }
                     }
                 }
             }
