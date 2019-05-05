@@ -6,7 +6,7 @@ Provides a way to create user-defined mappings between user-defined units and qu
 
 The `Translator` defines what to translate and the type of output when running a translation. A `Translation` tells the `Translator` how to go from the *input* to *output*.
 
-Since translations are user-defined, it's up to the implementation to correctly define going between *input* and *output* in a way that makes sense. When defining translations, a few different version exist:
+Since translations are user-defined, it's up to the implementation to correctly define going between *input* and *output* in a way that makes sense. When defining translations, a few different versions exist:
 
 ### Translation<TKey, TValue>
 
