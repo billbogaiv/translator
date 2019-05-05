@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using Translator;
 
@@ -25,31 +24,37 @@ namespace ConsoleSample
 
     public class LanguageTranslator : Translator<Language, string>
     {
-        public override List<Translation<Language, string>> Translations { get; } = new List<Translation<Language, string>>()
+        public LanguageTranslator()
         {
-            // These types of translations do not require expressions. They are simple 1:1 mappings. Also, notice the lack of direct translation between English and Spanish.
-            new DirectTranslation<Language, string>(Language.English, "hello", Language.German, "hallo"),
-            new DirectTranslation<Language, string>(Language.German, "hallo", Language.Italian, "ciao"),
-            new DirectTranslation<Language, string>(Language.Italian, "ciao", Language.Spanish, "hola"),
-            new DirectTranslation<Language, string>(Language.English, "goodbye", Language.German, "auf wiedersehen"),
-            new DirectTranslation<Language, string>(Language.English, "good", Language.German, "gut")
-        };
+            AddRange(new[]
+            {
+                // These types of translations do not require expressions. They are simple 1:1 mappings. Also, notice the lack of direct translation between English and Spanish.
+                new DirectTranslation<Language, string>(Language.English, "hello", Language.German, "hallo"),
+                new DirectTranslation<Language, string>(Language.German, "hallo", Language.Italian, "ciao"),
+                new DirectTranslation<Language, string>(Language.Italian, "ciao", Language.Spanish, "hola"),
+                new DirectTranslation<Language, string>(Language.English, "goodbye", Language.German, "auf wiedersehen"),
+                new DirectTranslation<Language, string>(Language.English, "good", Language.German, "gut")
+            });
+        }
     }
 
     public class MeasurementTranslator : Translator<Unit, double>
     {
-        public override List<Translation<Unit, double>> Translations { get; } = new List<Translation<Unit, double>>()
+        public MeasurementTranslator()
         {
-            // If you really don't want translations from dm -> cm.
-            new ForwardOnlyTranslation<Unit, double>(Unit.Centimeter, Unit.Decimeter, x => x / 10),
+            AddRange(new[]
+            {
+                // If you really don't want translations from dm -> cm.
+                new ForwardOnlyTranslation<Unit, double>(Unit.Centimeter, Unit.Decimeter, x => x / 10),
 
-            // This constructor provides a seed-value that is used by both expressions during translations.
-            new Translation<Unit, double>(10, Unit.Centimeter, (x, seed) => x / seed, Unit.Millimeter, (x, seed) => x * seed),
+                // This constructor provides a seed-value that is used by both expressions during translations.
+                new Translation<Unit, double>(10, Unit.Centimeter, (x, seed) => x / seed, Unit.Millimeter, (x, seed) => x * seed),
 
-            new Translation<Unit, double>(2.54, Unit.Inch, (x, seed) => x / seed, Unit.Centimeter, (x, seed) => x * seed),
-            new Translation<Unit, double>(12, Unit.Inch, (x, seed) => x * seed, Unit.Foot, (x, seed) => x / seed),
-            new Translation<Unit, double>(Unit.Foot, x => x * 5280, Unit.Mile, x => x / 5280)
-        };
+                new Translation<Unit, double>(2.54, Unit.Inch, (x, seed) => x / seed, Unit.Centimeter, (x, seed) => x * seed),
+                new Translation<Unit, double>(12, Unit.Inch, (x, seed) => x * seed, Unit.Foot, (x, seed) => x / seed),
+                new Translation<Unit, double>(Unit.Foot, x => x * 5280, Unit.Mile, x => x / 5280)
+            });
+        }
     }
 
     class Program

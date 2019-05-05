@@ -5,6 +5,8 @@
 
     /// <summary>
     /// A translation defines what two-items are translatable and how to translate them.
+    /// 
+    /// When using a translator to traverse translations, only `keyA` and `keyB` are used to compare whether a match is found.
     /// </summary>
     public class Translation<TKey, TValue>
     {

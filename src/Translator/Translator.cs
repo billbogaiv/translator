@@ -5,23 +5,33 @@ namespace Translator
 {
     public abstract class Translator<TKey, TValue>
     {
-        public abstract List<Translation<TKey, TValue>> Translations { get; }
+        private List<Translation<TKey, TValue>> translations = new List<Translation<TKey, TValue>>();
 
-        public (bool, IReadOnlyCollection<Translation<TKey, TValue>>) TryTranslation(
+        public void Add(Translation<TKey, TValue> translation)
+        {
+            translations.Add(translation);
+
+            if (!(translation is ForwardOnlyTranslation<TKey, TValue>))
+            {
+                translations.Add(translation.Swap());
+            }
+        }
+
+        public void AddRange(IEnumerable<Translation<TKey, TValue>> translations)
+        {
+            this.translations.AddRange(
+                translations.Union(translations
+                    .Where(x => !(x is ForwardOnlyTranslation<TKey, TValue>))
+                    .Select(x => x.Swap())));
+        }
+
+        public (bool foundTranslation, IReadOnlyCollection<Translation<TKey, TValue>> translationSteps) TryTranslation(
             TValue fromValue,
             TKey fromKey,
             TKey toKey,
             out TValue translated)
         {
-            var swappedTranslations = Translations
-                .Where(x => x.ValueA != null)
-                .Select(x => x is DirectTranslation<TKey, TValue>
-                    ? new DirectTranslation<TKey,TValue>(x.KeyB, x.ValueB(default(TValue)), x.KeyA, x.ValueA(default(TValue)))
-                    : new Translation<TKey, TValue>(x.KeyB, x.ValueB, x.KeyA, x.ValueA))
-                .ToList();
-            var allTranslations = Translations.Union(swappedTranslations).ToList();
-
-            var (foundTranslation, translationSteps) = Finder(allTranslations, fromValue, fromKey, toKey);
+            var (foundTranslation, translationSteps) = Finder(translations, fromValue, fromKey, toKey);
 
             if (foundTranslation)
             {
@@ -58,16 +68,16 @@ namespace Translator
             TKey fromKey,
             TKey toKey,
             List<Translation<TKey, TValue>> translationSteps = null,
-            List<KeyValuePair<TKey, TKey>> pathsTraveled = null)
+            HashSet<KeyValuePair<TKey, TKey>> pathsTraveled = null)
         {
             translationSteps = translationSteps ?? new List<Translation<TKey, TValue>>();
-            pathsTraveled = pathsTraveled ?? new List<KeyValuePair<TKey, TKey>>();
+            pathsTraveled = pathsTraveled ?? new HashSet<KeyValuePair<TKey, TKey>>();
 
             var keyEqualityComparer = EqualityComparer<TKey>.Default;
             var valueEqualityComparer = EqualityComparer<TValue>.Default;
             var fromSet = translations
-                .Where(x => x is DirectTranslation<TKey, TValue>
-                    ? keyEqualityComparer.Equals(x.KeyA, fromKey) && valueEqualityComparer.Equals(x.ValueA(default(TValue)), fromValue)
+                .Where(x => x is DirectTranslation<TKey, TValue> directTranslation
+                    ? keyEqualityComparer.Equals(directTranslation.KeyA, fromKey) && valueEqualityComparer.Equals(directTranslation.DirectValueA, fromValue)
                     : keyEqualityComparer.Equals(x.KeyA, fromKey))
                 .ToList();
 
@@ -83,14 +93,16 @@ namespace Translator
 
             foreach (var item in fromSet)
             {
-                if (!pathsTraveled.Contains(new KeyValuePair<TKey, TKey>(fromKey, item.KeyB)))
+                var pathKey = new KeyValuePair<TKey, TKey>(fromKey, item.KeyB);
+
+                if (!pathsTraveled.Contains(pathKey))
                 {
-                    pathsTraveled.Add(new KeyValuePair<TKey, TKey>(fromKey, item.KeyB));
+                    pathsTraveled.Add(pathKey);
 
                     var (finderFound, finderTranslationSteps) = Finder(
                         translations,
-                        item is DirectTranslation<TKey, TValue>
-                            ? item.ValueB(default(TValue))
+                        item is DirectTranslation<TKey, TValue> directTranslation
+                            ? directTranslation.DirectValueB
                             : fromValue,
                         item.KeyB,
                         toKey,
