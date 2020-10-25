@@ -57,10 +57,25 @@ namespace ConsoleSample
         }
     }
 
+    public class LargeTranslator : Translator<int, int>
+    { }
+
     class Program
     {
         static void Main(string[] args)
         {
+            var largeTranslator = new LargeTranslator();
+
+            largeTranslator.AddRange(Enumerable.Range(0, 500000).Select(x => new DirectTranslation<int, int>(keyA: x, valueA: x, keyB: x + 1, valueB: x + 1)));
+
+            var (foundLargeTranslation, largeTranslationSteps) = largeTranslator.TryTranslation(0, 0, 11, out var largeTranslated, new TranslatorSettings() { MaximumPathTraversal = 10 });
+
+            Console.WriteLine($"Large stepped-translation of `0` from 0 to 11, but should not find endpoint due to settings stopping traversal at 10");
+            Console.WriteLine("--------------------\n");
+            Console.WriteLine($"Translation found: {foundLargeTranslation.ToString()}");
+            Console.WriteLine($"Translation steps: {string.Join(" => ", largeTranslationSteps.Select(x => $"{x.KeyA.ToString()}->{x.KeyB.ToString()}"))}");
+            Console.WriteLine($"Translated value: {largeTranslated}");
+
             var languageTranslator = new LanguageTranslator();
 
             var englishHello = "hello";
@@ -70,7 +85,7 @@ namespace ConsoleSample
 
             var (foundLanguageTranslation, translationSteps) = languageTranslator.TryTranslation(englishHello, Language.English, Language.German, out var languageTranslated);
 
-            Console.WriteLine($"Language translation of `{englishHello}` from {Language.English} to {Language.German}");
+            Console.WriteLine($"\n\nLanguage translation of `{englishHello}` from {Language.English} to {Language.German}");
             Console.WriteLine("--------------------\n");
             Console.WriteLine($"Translation found: {foundLanguageTranslation.ToString()}");
             Console.WriteLine($"Translation steps: {string.Join(" => ", translationSteps.Select(x => $"{x.KeyA.ToString()}->{x.KeyB.ToString()}"))}");

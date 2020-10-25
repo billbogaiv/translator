@@ -5,6 +5,8 @@ namespace Translator
 {
     public abstract class Translator<TKey, TValue>
     {
+        public TranslatorSettings Settings { get; set; }
+
         private Dictionary<TKey, Dictionary<TKey, HashSet<Translation<TKey, TValue>>>> translations = new Dictionary<TKey, Dictionary<TKey, HashSet<Translation<TKey, TValue>>>>();
 
         public void Add(Translation<TKey, TValue> translation)
@@ -42,7 +44,19 @@ namespace Translator
             TKey toKey,
             out TValue translated)
         {
-            var (foundTranslation, translationSteps) = Finder(translations, fromValue, fromKey, toKey);
+            return TryTranslation(fromValue, fromKey, toKey, out translated, null);
+        }
+
+        public (bool foundTranslation, IReadOnlyCollection<Translation<TKey, TValue>> translationSteps) TryTranslation(
+        TValue fromValue,
+            TKey fromKey,
+            TKey toKey,
+            out TValue translated,
+            TranslatorSettings settings = null)
+        {
+            settings = settings ?? Settings ?? new TranslatorSettings();
+
+            var (foundTranslation, translationSteps) = Finder(translations, fromValue, fromKey, toKey, settings);
 
             if (foundTranslation)
             {
@@ -63,7 +77,7 @@ namespace Translator
                     }
                 }
 
-                translated = translationSteps.Aggregate(fromValue, (acc, translation) => translation.ValueB(acc));
+                translated = translationSteps.Aggregate(fromValue, (accumulator, translation) => translation.ValueB(accumulator));
 
                 return (true, translationSteps);
             }
@@ -73,11 +87,12 @@ namespace Translator
             return (false, Enumerable.Empty<Translation<TKey, TValue>>().ToList());
         }
 
-        private (bool, List<Translation<TKey, TValue>>) Finder(
+        private (bool foundTranslation, List<Translation<TKey, TValue>> translationSteps) Finder(
             Dictionary<TKey, Dictionary<TKey, HashSet<Translation<TKey, TValue>>>> translations,
             TValue fromValue,
             TKey fromKey,
             TKey toKey,
+            TranslatorSettings settings,
             List<Translation<TKey, TValue>> translationSteps = null,
             HashSet<KeyValuePair<TKey, TKey>> pathsTraveled = null)
         {
@@ -110,27 +125,35 @@ namespace Translator
                         ? valueEqualityComparer.Equals(directTranslation.DirectValueA, fromValue)
                         : true))
                 {
-                    var pathKey = new KeyValuePair<TKey, TKey>(fromKey, item.KeyB);
-
-                    if (!pathsTraveled.Contains(pathKey))
+                    if (pathsTraveled.Count >= settings.MaximumPathTraversal - 1)
                     {
-                        pathsTraveled.Add(pathKey);
+                        break;
+                    }
+                    else
+                    {
+                        var pathKey = new KeyValuePair<TKey, TKey>(fromKey, item.KeyB);
 
-                        var (finderFound, finderTranslationSteps) = Finder(
-                            translations,
-                            item is DirectTranslation<TKey, TValue> directTranslation
-                                ? directTranslation.DirectValueB
-                                : fromValue,
-                            item.KeyB,
-                            toKey,
-                            translationSteps,
-                            pathsTraveled);
-
-                        if (finderFound)
+                        if (!pathsTraveled.Contains(pathKey))
                         {
-                            finderTranslationSteps.Insert(0, item);
+                            pathsTraveled.Add(pathKey);
 
-                            return (finderFound, finderTranslationSteps);
+                            var (finderFound, finderTranslationSteps) = Finder(
+                                translations,
+                                item is DirectTranslation<TKey, TValue> directTranslation
+                                    ? directTranslation.DirectValueB
+                                    : fromValue,
+                                item.KeyB,
+                                toKey,
+                                settings,
+                                translationSteps,
+                                pathsTraveled);
+
+                            if (finderFound)
+                            {
+                                finderTranslationSteps.Insert(0, item);
+
+                                return (finderFound, finderTranslationSteps);
+                            }
                         }
                     }
                 }
